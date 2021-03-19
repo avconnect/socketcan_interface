@@ -72,6 +72,15 @@ public:
                 return false;
             }
 
+            // todo: make this optional?
+            int enable_canfd = 1;
+            ret = setsockopt(sc, SOL_CAN_RAW, CAN_RAW_FD_FRAMES, &enable_canfd, sizeof(enable_canfd));
+            if(ret != 0){
+                setErrorCode(boost::system::error_code(ret,boost::system::system_category()));
+                close(sc);
+                return false;
+            }
+
             if(loopback_){
                 int recv_own_msgs = 1; /* 0 = disabled (default), 1 = enabled */
                 ret = setsockopt(sc, SOL_CAN_RAW, CAN_RAW_RECV_OWN_MSGS, &recv_own_msgs, sizeof(recv_own_msgs));
@@ -160,10 +169,13 @@ public:
 protected:
     std::string device_;
     can_frame frame_;
+    canfd_frame frameb_;
 
     virtual void triggerReadSome(){
         boost::mutex::scoped_lock lock(send_mutex_);
-        socket_.async_read_some(boost::asio::buffer(&frame_, sizeof(frame_)), boost::bind( &SocketCANInterface::readFrame,this, boost::asio::placeholders::error));
+//        socket_.async_read_some(boost::asio::buffer(&frame_, sizeof(frame_)), boost::bind( &SocketCANInterface::readFrame,this, boost::asio::placeholders::error));
+
+        socket_.async_read_some(boost::asio::buffer(&frameb_, sizeof(frameb_)), boost::bind( &SocketCANInterface::readFrame,this, boost::asio::placeholders::error));
     }
 
     virtual bool enqueue(const Frame & msg){
@@ -191,13 +203,13 @@ protected:
 
     void readFrame(const boost::system::error_code& error){
         if(!error){
-            input_.dlc = frame_.can_dlc;
-            for(int i=0;i<frame_.can_dlc && i < 8; ++i){
-                input_.data[i] = frame_.data[i];
+            input_.dlc = frameb_.len;
+            for(int i=0;i<frameb_.len && i < 64; ++i){
+                input_.data[i] = frameb_.data[i];
             }
 
-            if(frame_.can_id & CAN_ERR_FLAG){ // error message
-                input_.id = frame_.can_id & CAN_EFF_MASK;
+            if(frameb_.can_id & CAN_ERR_FLAG){ // error message
+                input_.id = frameb_.can_id & CAN_EFF_MASK;
                 input_.is_error = 1;
 
                 LOG("error: " << input_.id);
@@ -205,13 +217,14 @@ protected:
                 setNotReady();
 
             }else{
-                input_.is_extended = (frame_.can_id & CAN_EFF_FLAG) ? 1 :0;
-                input_.id = frame_.can_id & (input_.is_extended ? CAN_EFF_MASK : CAN_SFF_MASK);
+                input_.is_extended = (frameb_.can_id & CAN_EFF_FLAG) ? 1 :0;
+                input_.id = frameb_.can_id & (input_.is_extended ? CAN_EFF_MASK : CAN_SFF_MASK);
                 input_.is_error = 0;
-                input_.is_rtr = (frame_.can_id & CAN_RTR_FLAG) ? 1 : 0;
+                input_.is_rtr = (frameb_.can_id & CAN_RTR_FLAG) ? 1 : 0;
             }
 
         }
+
         frameReceived(error);
     }
 private:

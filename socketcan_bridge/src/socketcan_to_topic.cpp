@@ -75,6 +75,7 @@ namespace socketcan_bridge
       setup(can::tofilters(filters));
   }
   void SocketCANToTopic::setup(ros::NodeHandle nh) {
+      std::cout<<"setting up"<<std::endl;
        XmlRpc::XmlRpcValue filters;
        if(nh.getParam("can_ids", filters)) return setup(filters);
        return setup();
@@ -83,11 +84,14 @@ namespace socketcan_bridge
 
   void SocketCANToTopic::frameCallback(const can::Frame& f)
     {
-      // ROS_DEBUG("Message came in: %s", can::tostring(f, true).c_str());
+      ROS_ERROR("Message came in: %s", can::tostring(f, true).c_str());
+      std::cout << "Message came in: %s" << can::tostring(f, true).c_str()<< std::endl;
+//      std::cout << "Got a frame" << std::endl;
       if (!f.isValid())
       {
         ROS_ERROR("Invalid frame from SocketCAN: id: %#04x, length: %d, is_extended: %d, is_error: %d, is_rtr: %d",
                   f.id, f.dlc, f.is_extended, f.is_error, f.is_rtr);
+        std::cout << "invalid";
         return;
       }
       else
@@ -97,6 +101,7 @@ namespace socketcan_bridge
           // can::tostring cannot be used for dlc > 8 frames. It causes an crash
           // due to usage of boost::array for the data array. The should always work.
           ROS_WARN("Received frame is error: %s", can::tostring(f, true).c_str());
+          std::cout << "Received frame is error: %s" << can::tostring(f, true).c_str() << std::endl;
         }
       }
 

@@ -61,7 +61,7 @@ struct Frame: public Header{
 
     /** check if frame header and length are valid*/
     bool isValid() const{
-        return (dlc <= 8)  &&  Header::isValid();
+        return (dlc <= 64)  &&  Header::isValid();
     }
     /**
      * constructor with default parameters
